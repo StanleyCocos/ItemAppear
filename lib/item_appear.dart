@@ -23,13 +23,19 @@ class ItemAppear extends StatefulWidget {
   * */
   final List<ItemAppearModel> items;
 
+
+  /*
+  *  是否重复 默认不重复(重复刷到数据不统计)
+  * */
+  final bool repeat;
+
   /*
   *  出现回调
   * */
   final ItemAppearCallback? callback;
 
 
-  const ItemAppear({Key? key, required this.child, required this.items, this.callback}) : super(key: key);
+  const ItemAppear({Key? key, required this.child, required this.items, this.repeat = false, this.callback}) : super(key: key);
 
   @override
   State<StatefulWidget> createState() => _ItemAppearState();
@@ -104,7 +110,7 @@ class _ItemAppearState extends State<ItemAppear> {
         var size = renderBoxRed.size;
         var offset = renderBoxRed.localToGlobal(Offset.zero);
         if (offset.dy < _min || offset.dy + size.height > _max) {
-          item.isAppear = false;
+          if(widget.repeat) item.isAppear = false;
           continue;
         }
         if(item.isAppear) continue;
@@ -113,7 +119,7 @@ class _ItemAppearState extends State<ItemAppear> {
         appear.add(widget.items[index]);
 
       } else {
-        item.isAppear = false;
+        if(widget.repeat) item.isAppear = false;
       }
     }
     widget.callback?.call(appear);
