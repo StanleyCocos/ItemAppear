@@ -62,7 +62,9 @@ ItemAppear(
       }
      });
   },
+  // 数据源
   items: list,
+  // 需要统计的列表
   child: flow,
 ),
 
