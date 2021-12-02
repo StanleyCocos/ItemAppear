@@ -1,39 +1,71 @@
-<!-- 
-This README describes the package. If you publish this package to pub.dev,
-this README's contents appear on the landing page for your package.
+### flutter为item 添加完全展示在屏幕统计
 
-For information about how to write a good package README, see the guide for
-[writing package pages](https://dart.dev/guides/libraries/writing-package-pages). 
+#### 引入
+```
+appear:
+    git:
+      url: https://github.com/StanleyCocos/ItemAppear.git
 
-For general information about developing packages, see the Dart guide for
-[creating packages](https://dart.dev/guides/libraries/create-library-packages)
-and the Flutter guide for
-[developing packages and plugins](https://flutter.dev/developing-packages). 
--->
+``` 
 
-TODO: Put a short description of the package here that helps potential users
-know whether this package might be useful for them.
+#### 使用
+1. 创建数据源
+```
+class Model extends ItemAppearModel {
 
-## Features
+  int index = 0;
+  String name = "";
+  double height = 100;
+  Model({
+    required this.index,
+    required this.name,
+    this.height = 100,
+  });
+}
+```
+2. 添加key
+```
+return GridView.builder(
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        mainAxisSpacing: 20.0,
+        crossAxisSpacing: 10.0,
+        childAspectRatio: 1.0,
+      ),
+      itemBuilder: (context, position) {
+        var model = list[position];
+        return GestureDetector(
+          child: Container(
+            key: model.key,
+            width: double.infinity,
+            height: 100,
+            color: Colors.blue,
+            child: Center(
+              child: Text("$position"),
+            ),
+          ),
+        );
+      },
+      itemCount: list.length,
+    );
+  }
+  ```
+  
+  3. 接收回调
+```
+ItemAppear(
+  callback: (list){
+  // 回调相应完整出现在屏幕的item
+  list.forEach((element) {
+    if (element is Model) {
+      print("${element.index} 出现");
+      }
+     });
+  },
+  items: list,
+  child: flow,
+),
 
-TODO: List what your package can do. Maybe include images, gifs, or videos.
-
-## Getting started
-
-TODO: List prerequisites and provide or point to information on how to
-start using the package.
-
-## Usage
-
-TODO: Include short and useful examples for package users. Add longer examples
-to `/example` folder. 
-
-```dart
-const like = 'sample';
 ```
 
-## Additional information
-
-TODO: Tell users more about the package: where to find more information, how to 
-contribute to the package, how to file issues, what response they can expect 
-from the package authors, and more.
+  
