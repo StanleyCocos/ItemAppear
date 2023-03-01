@@ -1,133 +1,138 @@
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/widgets.dart';
 
-
-/*
-*  item 出现回调
-*  @items: 出现的item 数据源
-* */
+/// Item被展示后的回调
 typedef ItemAppearCallback = void Function(List<ItemAppearModel> items);
 
-
-/*
-*  计算子视图(列表) 完全展示屏幕
-* */
+/// 视图Item完全暴露在屏幕上计入曝光
+/// 可用于统计 瀑布流WaterFlow、ListView、GridView 的 Item的曝光事件
 class ItemAppear extends StatefulWidget {
-
-  /*
-  * 子视图(必须是 list grid 或流式布局)
-  * */
-  final Widget child;
-
-  /*
-  *  数据源 继承至ItemAppearModel
-  * */
-  final List<ItemAppearModel> items;
-
-
-  /*
-  *  是否重复 默认不重复(重复刷到数据不统计)
-  * */
+  /// 是否重复 默认不重复(Item重新曝光不统计数据)
   final bool repeat;
 
-  /*
-  *  出现回调
-  * */
-  final ItemAppearCallback? callback;
+  /// 子视图的滚动方向，默认为垂直方向
+  final Axis scrollDirection;
 
+  /// 数据源 需要继承至 ItemAppearModel
+  final List<ItemAppearModel> items;
 
-  const ItemAppear({Key? key, required this.child, required this.items, this.repeat = false, this.callback}) : super(key: key);
+  /// Item被展示后的回调
+  final ItemAppearCallback callback;
+
+  /// 子视图，必须为可滚动组件，如 瀑布流WaterFlow、ListView、GridView等
+  final Widget child;
+
+  const ItemAppear({
+    Key? key,
+    this.repeat = false,
+    this.scrollDirection = Axis.vertical,
+    required this.items,
+    required this.callback,
+    required this.child,
+  }) : super(key: key);
 
   @override
-  State<StatefulWidget> createState() => _ItemAppearState();
+  State<ItemAppear> createState() => _ItemAppearState();
 }
 
 class _ItemAppearState extends State<ItemAppear> {
+  /// 当前整体视图的 GlobalKey
+  final GlobalKey selfKey = GlobalKey();
 
-  final GlobalKey _selfKey = GlobalKey();
-  double _dy = 0.0;
-  double _dx = 0.0;
-  double _width = 0.0;
-  double _height = 0.0;
-  double _min = 0.0;
-  double _max = 0.0;
-  List<ItemAppearModel> appear = [];
+  /// 当前整体视图的偏移位置（左上角）
+  double dx = 0.0;
+  double dy = 0.0;
 
+  /// 当前整体视图的宽高
+  double width = 0.0;
+  double height = 0.0;
+
+  /// 当前整体视图的 最小宽(高)度 和 最大宽(高)度
+  double min = 0.0;
+  double max = 0.0;
+
+  /// 已出现的Item，返回回调时的结果
+  List<ItemAppearModel> appearBucket = [];
 
   @override
   void initState() {
-    WidgetsBinding.instance!
-        .addPostFrameCallback((_){
-      _initData();
-    });
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => initConfig());
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    initConfig();
+  }
+
+  /// 初始化整体视图的相关参数
+  void initConfig() {
+    RenderObject? renderObject = selfKey.currentContext?.findRenderObject();
+    if (renderObject == null || renderObject is! RenderBox) return;
+    Offset offset = renderObject.localToGlobal(Offset.zero);
+    Size size = renderObject.size;
+    dx = offset.dx;
+    dy = offset.dy;
+    width = size.width;
+    height = size.height;
+    if (widget.scrollDirection == Axis.vertical) {
+      min = dy;
+      max = dy + height;
+    } else {
+      min = dx;
+      max = dx + width;
+    }
+    calculate();
+  }
+
+  void calculate() {
+    appearBucket.clear();
+    for (var item in widget.items) {
+      RenderObject? renderObject = item.key.currentContext?.findRenderObject();
+      if (renderObject == null || renderObject is! RenderBox) continue;
+      Offset offset = renderObject.localToGlobal(Offset.zero);
+      Size size = renderObject.size;
+      // 如果需要重复统计
+      if (widget.scrollDirection == Axis.vertical) {
+        if (offset.dy < min || offset.dy + size.height > max) {
+          if (widget.repeat) item.isAppear = false;
+          continue;
+        }
+      } else {
+        if (offset.dx < min || offset.dx + size.width > max) {
+          if (widget.repeat) item.isAppear = false;
+          continue;
+        }
+      }
+      // 已经曝光的Item直接跳过
+      if (item.isAppear) continue;
+      // 将曝光的Item加入bucket
+      item.isAppear = true;
+      appearBucket.add(item);
+    }
+    widget.callback.call(appearBucket);
   }
 
   @override
   Widget build(BuildContext context) {
     return NotificationListener(
-      key: _selfKey,
-      onNotification: (ScrollNotification notification) {
-        //开始滚动
-        if (notification is ScrollStartNotification) {
-          // print("开始滚动");
-        } else if (notification is ScrollUpdateNotification) {
-          // print("正在滚动---总滚动的距离${notification.metrics.maxScrollExtent}");
-          // print("正在滚动---已经滚动的距离${notification.metrics.pixels}");
-        } else if (notification is ScrollEndNotification) {
-          // print("结束滚动");
-          _calculate();
+      key: selfKey,
+      onNotification: (notification) {
+        // 滚动结束回调
+        if (notification is ScrollEndNotification) {
+          calculate();
         }
         return true;
       },
       child: widget.child,
     );
   }
-
-  void _initData(){
-    var renderBoxRed = _selfKey.currentContext?.findRenderObject();
-    if (renderBoxRed != null && renderBoxRed is RenderBox) {
-      var size = renderBoxRed.size;
-      var offset = renderBoxRed.localToGlobal(Offset.zero);
-      // print("父视图: x: ${offset.dx} y: ${offset.dy}  width: ${size.width} height: ${size.height}");
-      _dy = offset.dy;
-      _dx = offset.dx;
-      _width = size.width;
-      _height = size.height;
-      _min = _dy;
-      _max = _dy + size.height;
-
-      _calculate();
-    }
-  }
-
-
-  void _calculate(){
-    appear.clear();
-    for(int index = 0; index < widget.items.length; index ++){
-      ItemAppearModel item = widget.items[index];
-      var renderBoxRed = item.key.currentContext?.findRenderObject();
-      if (renderBoxRed != null && renderBoxRed is RenderBox) {
-        var size = renderBoxRed.size;
-        var offset = renderBoxRed.localToGlobal(Offset.zero);
-        if (offset.dy < _min || offset.dy + size.height > _max) {
-          if(widget.repeat) item.isAppear = false;
-          continue;
-        }
-        if(item.isAppear) continue;
-
-        item.isAppear = true;
-        appear.add(widget.items[index]);
-
-      } else {
-        if(widget.repeat) item.isAppear = false;
-      }
-    }
-    widget.callback?.call(appear);
-  }
 }
 
-
 abstract class ItemAppearModel {
-  GlobalKey key = GlobalKey();
+  /// 用于获取和定位当前Item
+  final GlobalKey key = GlobalKey();
+
+  /// 当前Item是否已经展示过
   bool isAppear = false;
 }
